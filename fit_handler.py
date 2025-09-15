@@ -27,7 +27,7 @@ def fit_handler(algo_name, cid, config, net, trainloader, client_control=None, p
     """
     if algo_name == "fedprox":
         res_metrics = train(net, trainloader, DEVICE=config['device'], learning_rate=config["learning_rate"], epochs=config["epochs"], proximal_mu=config['proximal_mu'] * config["entropy"])
-    elif algo_name in ["fedavg", "feddisco", "fedcls", "fedadp", "fedimp"]:
+    elif algo_name in ["fedavg", "feddisco", "fedcls", "fedadp", "fedimp", "fedhcw"]:
         res_metrics = train(net, trainloader, DEVICE=config['device'], learning_rate=config["learning_rate"], epochs=config["epochs"])
     elif algo_name == "fedntd":
         res_metrics = train(net, trainloader, DEVICE=config['device'], learning_rate=config["learning_rate"], epochs=config["epochs"], use_ntd_loss=True, tau=config["tau"], beta=config["beta"])
