@@ -16,6 +16,12 @@ def get_num_rounds(dataset_name):
     elif dataset_name == 'cifar100': 
         return 500
     
+def make_cluster_sizes(num_clients, num_clusters):
+    base = num_clients // num_clusters
+    rem = num_clients % num_clusters
+    sizes = [base + (1 if i < rem else 0) for i in range(num_clusters)]
+    return sizes
+
 
 def get_distribution_diff_from_uniform(distribution, num_clients): 
     
@@ -33,12 +39,12 @@ def get_distribution_diff_from_uniform(distribution, num_clients):
     return dk 
 
 def get_fedhcw_config(dist, cluster_algo, NUM_CLIENTS, DISTANCE, AGGREGATE_CLUSTER_ALGORITHM, config): 
-
+    cluster_size = make_cluster_sizes(NUM_CLIENTS, 10)  
     client_cluster_index, distrib_ = clustering(
         dist, 
         algo=cluster_algo,
         num_clusters=10,
-        cluster_size=10 * [NUM_CLIENTS / 10], 
+        cluster_size=cluster_size, 
         distance=DISTANCE,
     )
     
@@ -62,8 +68,8 @@ def get_fedhcw_config(dist, cluster_algo, NUM_CLIENTS, DISTANCE, AGGREGATE_CLUST
             
         if AGGREGATE_CLUSTER_ALGORITHM == 'feddisco': 
             dist_cluster = {cid: dict(c) for cid, c in dist_cluster.items()}
-            dk = get_distribution_diff_from_uniform(distrib_, num_cluster) 
-            ALGORITHM_CONFIG = {**ALGORITHM_CONFIG, **{"dk": dk}}
+            dk = get_distribution_diff_from_uniform(dist_cluster, num_cluster) 
+            config = {**config, **{"dk": dk}}
         elif AGGREGATE_CLUSTER_ALGORITHM == 'fedcls':
             num_class_per_cluster = {
                 cid: sum(v > 0 for v in dist_cluster[cid].values())

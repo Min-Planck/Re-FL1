@@ -78,7 +78,7 @@ class BaseClient(fl.client.NumPyClient):
         if ALGO == 'fedhcw': 
             metrics["cluster_id"] = client_cluster_index[self.cid]
 
-        if algo == "scaffold":
+        if ALGO == "scaffold":
             self.client_control = metrics["client_control"]
             params_obj = metrics['params']
             client_params_news = parameters_to_ndarrays(params_obj)
