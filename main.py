@@ -62,6 +62,7 @@ class BaseClient(fl.client.NumPyClient):
         self.net = net
         self.trainloader = trainloader
         self.device = device
+        self.client_control = None
         self.num_classes = sum(v is not None and v > 0 for v in dist[cid].values())
 
     def get_parameters(self, config):
@@ -95,7 +96,7 @@ def client_fn(context: Context) -> BaseClient:
     cid = int(context.node_config["partition-id"])
     is_moon_type = True if ALGO == 'moon' else False
     net = get_model(dataset_name=DATASET_NAME, moon_type=is_moon_type) 
-
+    net.to(DEVICE)
     trainloader = trainloaders[int(cid)]  
     return BaseClient(cid, net, trainloader, DEVICE)
 
