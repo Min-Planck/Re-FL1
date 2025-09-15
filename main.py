@@ -68,7 +68,7 @@ class BaseClient(fl.client.NumPyClient):
         return get_parameters(self.net)
 
     def fit(self, parameters, config):
-        config = {**CLIENT_CONFIG, **config, **{"learning_rate": LR, "epochs": LOCAL_TRAINING, "entropy": self.entropy, "num_classes": self.num_classes, "device": self.device}}
+        config = {**CLIENT_CONFIG, **config, **{"learning_rate": LR, "epochs": LOCAL_TRAINING, "num_classes": self.num_classes, "device": self.device}}
         set_parameters(self.net, parameters)
         metrics = fit_handler(algo_name=ALGO, cid=self.cid, net=self.net, trainloader=self.trainloader, config=config, client_control=self.client_control, parameters=parameters)
         
