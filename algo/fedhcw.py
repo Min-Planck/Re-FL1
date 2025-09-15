@@ -28,7 +28,7 @@ class FedHCW(FedAvg):
         if self.aggregate_cluster_algorithm == 'fedadp':
             self.fedadp = FedAdp(*args, alpha=self.alpha_adp, **kwargs)
         elif self.aggregate_cluster_algorithm == 'feddisco':
-            self.feddisco = FedDisco(*args, dk=self.algorithm_config['dk'], alpha=self.alpha_disco, beta=self.beta_disco, **kwargs)
+            self.feddisco = FedDisco(*args, alpha=self.alpha_disco, beta=self.beta_disco, **kwargs)
         elif self.aggregate_cluster_algorithm == 'fedcls':
             self.fedcls = FedCLS(*args, alpha=self.alpha_cls, **kwargs)
 
