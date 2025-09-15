@@ -1,7 +1,7 @@
 from algo import *
 
 class FedCLS(FedAvg):
-    def __init__(self, *args, all_classes: int, alpha: float = 0.5, **kwargs):
+    def __init__(self, *args, alpha: float = 0.5, **kwargs):
         super().__init__(*args, **kwargs)
         self.alpha = alpha 
         self.all_classes = self.algorithm_config['all_classes']

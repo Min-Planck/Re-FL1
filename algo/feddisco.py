@@ -2,7 +2,7 @@ import torch.nn.functional as F
 from algo import * 
 
 class FedDisco(FedAvg):
-    def __init__(self, *args, dk: dict, alpha: float = 0.5, beta: float = 0.1, **kwargs):
+    def __init__(self, *args, alpha: float = 0.5, beta: float = 0.1, **kwargs):
         super().__init__(*args, **kwargs)
         self.alpha = alpha 
         self.beta = beta
