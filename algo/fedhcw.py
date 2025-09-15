@@ -21,11 +21,16 @@ class FedHCW(FedAvg):
 
         self.entropies = self.algorithm_config['entropies']
         self.aggregate_cluster_algorithm = self.algorithm_config.get('aggregate_cluster_algo', 'fedavg')
-        self.num_classes_per_cluster = self.algorithm_config['num_class_per_cluster']
+
+        if self.aggregate_cluster_algorithm == 'fedcls':
+            self.num_classes_per_cluster = self.algorithm_config['num_class_per_cluster']
         
-        self.fedadp = FedAdp(*args, alpha=self.alpha_adp, **kwargs)
-        self.feddisco = FedDisco(*args, dk=self.algorithm_config['dk'], alpha=self.alpha_disco, beta=self.beta_disco, **kwargs)
-        self.fedcls = FedCLS(*args, alpha=self.alpha_cls, **kwargs)
+        if self.aggregate_cluster_algorithm == 'fedadp':
+            self.fedadp = FedAdp(*args, alpha=self.alpha_adp, **kwargs)
+        elif self.aggregate_cluster_algorithm == 'feddisco':
+            self.feddisco = FedDisco(*args, dk=self.algorithm_config['dk'], alpha=self.alpha_disco, beta=self.beta_disco, **kwargs)
+        elif self.aggregate_cluster_algorithm == 'fedcls':
+            self.fedcls = FedCLS(*args, alpha=self.alpha_cls, **kwargs)
 
     def __repr__(self): 
         return 'FedHCW'
