@@ -1,5 +1,31 @@
 from algo import *
 
+def initialize_control_from_weights(weights: List[np.ndarray]) -> List[np.ndarray]:
+    """Initialize control variates as zeros with same shape as model weights"""
+    return [np.zeros_like(w) for w in weights]
+
+def parameters_to_torch_dict(parameters: List[np.ndarray], reference_model) -> OrderedDict:
+    """Convert numpy parameters to PyTorch state dict format"""
+    state_dict_keys = list(reference_model.state_dict().keys())
+    if len(parameters) != len(state_dict_keys):
+        raise ValueError(f"Parameters length {len(parameters)} doesn't match model state dict length {len(state_dict_keys)}")
+    
+    torch_dict = OrderedDict()
+    for key, param in zip(state_dict_keys, parameters):
+        torch_dict[key] = torch.from_numpy(param)
+    return torch_dict
+
+def torch_dict_to_parameters(torch_dict: OrderedDict) -> List[np.ndarray]:
+    """Convert PyTorch state dict to numpy parameters"""
+    return [tensor.cpu().numpy() for tensor in torch_dict.values()]
+
+def initialize_control_from_model(reference_model) -> List[np.ndarray]:
+    """Initialize control variates as zeros with same structure as model parameters"""
+    control_dict = OrderedDict()
+    for name, param in reference_model.state_dict().items():
+        control_dict[name] = torch.zeros_like(param)
+    return torch_dict_to_parameters(control_dict)
+
 class Scaffold(FedAvg):
     def __init__(
         self,
@@ -7,9 +33,10 @@ class Scaffold(FedAvg):
         **kwargs
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.server_controls  = {}
+        self.server_controls  = []
         self.client_controls  = {}
         self.num_model_params = None
+        self.reference_model = None
 
     def __repr__(self) -> str:
         return "Scaffold"
@@ -21,8 +48,12 @@ class Scaffold(FedAvg):
         clients = client_manager.sample(num_clients=sample_size, min_num_clients=min_num_clients)
         
         weights = parameters_to_ndarrays(parameters)
+        
+        # Initialize server controls using PyTorch approach for better BatchNorm handling
         if not self.server_controls: 
-            self.server_controls = [np.zeros_like(w) for w in weights]
+            if self.reference_model is None:
+                self.reference_model = copy.deepcopy(self.net)
+            self.server_controls = initialize_control_from_model(self.reference_model)
 
         if self.num_model_params is None:
             self.num_model_params = len(weights)
@@ -30,8 +61,11 @@ class Scaffold(FedAvg):
         instructions = []
         for client in clients:
             cid = int(client.cid)
+            # Initialize client controls using PyTorch approach 
             if cid not in self.client_controls.keys():
-                self.client_controls[cid] = [np.zeros_like(w) for w in weights]
+                if self.reference_model is None:
+                    self.reference_model = copy.deepcopy(self.net)
+                self.client_controls[cid] = initialize_control_from_model(self.reference_model)
             client_control = self.client_controls[cid]
             # Combine parameters: [model_weights, server_control, client_control]
             combined_weights = [*weights, *self.server_controls, *client_control]
@@ -54,9 +88,9 @@ class Scaffold(FedAvg):
         # Sum number of examples for weighting
         total_examples = sum(fit_res.num_examples for _, fit_res in results)
 
-        # Prepare accumulators
-        sum_model_params = [np.zeros_like(c) for c in self.server_controls]
-        sum_control_updates = [np.zeros_like(c) for c in self.server_controls]
+        # Prepare accumulators using PyTorch approach
+        sum_model_params = initialize_control_from_model(self.reference_model)
+        sum_control_updates = initialize_control_from_model(self.reference_model)
 
         # Iterate over client results
         for client, fit_res in results:
