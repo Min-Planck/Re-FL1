@@ -1,8 +1,7 @@
 import torch.nn.functional as F
 from torch import nn
 import torch
-from utils import get_parameters
-from flwr.common import ndarrays_to_parameters
+
 # ====== FedNTD ======
 def refine_as_not_true(logits, targets, num_classes):
     nt_positions = torch.arange(0, num_classes).to(logits.device)
@@ -174,7 +173,8 @@ def train_scaffold(
     server_control,
     client_control
 ):
-    
+    from utils import get_parameters
+    from flwr.common import ndarrays_to_parameters
     # Get model parameters to ensure correct structure alignment
     model_params = get_parameters(net)
     
