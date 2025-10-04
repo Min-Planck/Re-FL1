@@ -97,9 +97,9 @@ class Scaffold(FedAvg):
             cid = fit_res.metrics['id']
             res_weights = parameters_to_ndarrays(fit_res.parameters)
             
-            # Split parameters
+            # Split parameters: [model_weights, control_update]
             model_params = res_weights[:self.num_model_params]
-            client_control_update = res_weights[2*self.num_model_params:3*self.num_model_params]
+            client_control_update = res_weights[self.num_model_params:2*self.num_model_params]
             
             # Accumulate model parameters (example-weighted)
             for idx, w in enumerate(model_params):

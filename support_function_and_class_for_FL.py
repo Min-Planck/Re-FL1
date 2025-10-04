@@ -1,6 +1,8 @@
 import torch.nn.functional as F
 from torch import nn
 import torch
+from utils import get_parameters
+from flwr.common import ndarrays_to_parameters
 # ====== FedNTD ======
 def refine_as_not_true(logits, targets, num_classes):
     nt_positions = torch.arange(0, num_classes).to(logits.device)
@@ -172,12 +174,31 @@ def train_scaffold(
     server_control,
     client_control
 ):
-    from utils import get_parameters
-    from flwr.common import ndarrays_to_parameters
-    correction_tensors = [
-            torch.tensor(c_i - c_s, dtype=torch.float32, device=device)
-            for c_i, c_s in zip(client_control_old, server_control)
-        ]
+    
+    # Get model parameters to ensure correct structure alignment
+    model_params = get_parameters(net)
+    
+    # Debug info to identify shape mismatches
+    print(f"DEBUG: Model has {len(model_params)} parameters")
+    print(f"DEBUG: Client control has {len(client_control_old)} arrays")
+    print(f"DEBUG: Server control has {len(server_control)} arrays")
+    
+    # Ensure all control arrays have same length as model parameters
+    if len(client_control_old) != len(model_params) or len(server_control) != len(model_params):
+        raise ValueError(f"Control arrays length mismatch: model={len(model_params)}, "
+                        f"client_control={len(client_control_old)}, server_control={len(server_control)}")
+    
+    # Create correction tensors with proper shape checking
+    correction_tensors = []
+    for i, (c_i, c_s, model_param) in enumerate(zip(client_control_old, server_control, model_params)):
+        if c_i.shape != model_param.shape or c_s.shape != model_param.shape:
+            print(f"DEBUG: Shape mismatch at param {i}: "
+                  f"model={model_param.shape}, client_control={c_i.shape}, server_control={c_s.shape}")
+            raise ValueError(f"Shape mismatch at parameter {i}")
+        
+        correction = torch.tensor(c_i - c_s, dtype=torch.float32, device=device)
+        correction_tensors.append(correction)
+    
     initial_weights = get_parameters(net)
 
     criterion = nn.CrossEntropyLoss()
@@ -196,9 +217,16 @@ def train_scaffold(
             loss.backward()
             
             with torch.no_grad():
-                for param, corr in zip(net.parameters(), correction_tensors):
-                    if param.grad is not None:
-                        param.grad -= corr
+                param_idx = 0
+                for param in net.parameters():
+                    if param.grad is not None and param_idx < len(correction_tensors):
+                        corr = correction_tensors[param_idx]
+                        # Ensure shapes match before subtraction
+                        if param.grad.shape == corr.shape:
+                            param.grad -= corr
+                        else:
+                            print(f"⚠ Shape mismatch at param {param_idx}: grad={param.grad.shape}, corr={corr.shape}")
+                    param_idx += 1
             
             optimizer.step()
             
@@ -231,7 +259,7 @@ def train_scaffold(
         'loss': total_loss / num_batches,
         'accuracy': correct / total,
         'params': ndarrays_to_parameters(
-                updated_weights + server_control + control_update
+                updated_weights + control_update
             ),
         'client_control': client_control
         }
