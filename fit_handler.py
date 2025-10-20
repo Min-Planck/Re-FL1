@@ -66,7 +66,6 @@ def fit_handler(algo_name, cid, config, net, trainloader, client_control=None, p
         }
     elif algo_name == "scaffold":
         if isinstance(parameters, list):
-            print("⚠ Received list instead of Parameters, converting...")
             parameters = ndarrays_to_parameters(parameters)
         full_params = parameters_to_ndarrays(parameters)
         
@@ -74,11 +73,8 @@ def fit_handler(algo_name, cid, config, net, trainloader, client_control=None, p
         model_params = get_parameters(net)
         num_model_params = len(model_params)
         
-        # Verify we have correct structure: 3 * num_model_params from server
         expected_length = 3 * num_model_params
         if len(full_params) != expected_length:
-            print(f"⚠ Parameter length mismatch: expected {expected_length}, got {len(full_params)}")
-            print(f"  Model has {num_model_params} parameters")
             num_model_params = len(full_params) // 3
         
         model_weights = full_params[:num_model_params]

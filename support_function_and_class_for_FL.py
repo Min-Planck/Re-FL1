@@ -176,32 +176,21 @@ def train_scaffold(
     from utils import get_parameters
     from flwr.common import ndarrays_to_parameters
     
-    # Get model state_dict keys để match với control variables
     model_state_dict = net.state_dict()
     model_keys = list(model_state_dict.keys())
     model_params = get_parameters(net)
     
-    # Debug info to identify shape mismatches
-    print(f"DEBUG: Model has {len(model_params)} parameters")
-    print(f"DEBUG: Client control has {len(client_control_old)} arrays")
-    print(f"DEBUG: Server control has {len(server_control)} arrays")
-    
-    # Ensure all control arrays have same length as model parameters
     if len(client_control_old) != len(model_params) or len(server_control) != len(model_params):
         raise ValueError(f"Control arrays length mismatch: model={len(model_params)}, "
                         f"client_control={len(client_control_old)}, server_control={len(server_control)}")
     
-    # Tạo mapping từ parameter keys đến correction tensors
     correction_dict = {}
     named_params = dict(net.named_parameters())
     
     for i, (key, c_i, c_s, model_param) in enumerate(zip(model_keys, client_control_old, server_control, model_params)):
         if c_i.shape != model_param.shape or c_s.shape != model_param.shape:
-            print(f"DEBUG: Shape mismatch at param {i} ({key}): "
-                  f"model={model_param.shape}, client_control={c_i.shape}, server_control={c_s.shape}")
             raise ValueError(f"Shape mismatch at parameter {i} ({key})")
         
-        # Chỉ tạo correction tensor nếu parameter này có gradient (là trainable)
         if key in named_params and named_params[key].requires_grad:
             correction = torch.tensor(c_i - c_s, dtype=torch.float32, device=device)
             correction_dict[key] = correction
@@ -224,28 +213,24 @@ def train_scaffold(
             loss.backward()
             
             with torch.no_grad():
-                # Áp dụng correction cho từng parameter theo tên
                 for param_name, param in net.named_parameters():
                     if param.grad is not None and param_name in correction_dict:
                         corr = correction_dict[param_name]
-                        # Ensure shapes match before subtraction
                         if param.grad.shape == corr.shape:
                             param.grad -= corr
                         else:
-                            print(f"⚠ Shape mismatch at param {param_name}: grad={param.grad.shape}, corr={corr.shape}")
+                            print(f"Shape mismatch at param {param_name}: grad={param.grad.shape}, corr={corr.shape}")
                     elif param.grad is not None:
-                        print(f"DEBUG: Skipping correction for {param_name} (not in correction_dict or not trainable)")
+                        print(f"Skipping correction for {param_name} (not in correction_dict or not trainable)")
             
             optimizer.step()
             
-            # Update metrics
             total_loss += loss.item()
             pred = output.argmax(dim=1, keepdim=True)
             correct += pred.eq(target.view_as(pred)).sum().item()
             total += target.size(0)
             num_batches += 1
 
-        # Compute updated weights (wT)
         updated_weights = get_parameters(net)
 
         
