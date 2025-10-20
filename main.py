@@ -98,7 +98,7 @@ def client_fn(context: Context) -> BaseClient:
     net = get_model(dataset_name=DATASET_NAME, moon_type=is_moon_type) 
     net.to(DEVICE)
     trainloader = trainloaders[int(cid)]  
-    return BaseClient(cid, net, trainloader, DEVICE)
+    return BaseClient(cid, net, trainloader, DEVICE).to_client()
 
 # ------------------------------------ RUN -----------------------------------------
 
@@ -119,6 +119,7 @@ strategy = algo(
     current_parameters=current_parameters
 )
 
+print(f"Starting Federated Learning with {ALGO} on {DATASET_NAME} dataset")
 
 fl.simulation.start_simulation(
             client_fn           = client_fn,

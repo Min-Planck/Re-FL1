@@ -105,14 +105,14 @@ class Scaffold(FedAvg):
             for idx, w in enumerate(model_params):
                 sum_model_params[idx] += w * fit_res.num_examples
                 
-            # Accumulate control updates (uniform weighting)
+            # Accumulate control updates (uniform weighting) - fix casting issue
             for idx, cv in enumerate(client_control_update):
-                sum_control_updates[idx] += cv
+                sum_control_updates[idx] = sum_control_updates[idx] + cv.astype(sum_control_updates[idx].dtype)
                 
-            # Update stored client control
+            # Update stored client control - fix casting issue
             if cid in self.client_controls:
                 for idx in range(len(self.client_controls[cid])):
-                    self.client_controls[cid][idx] += client_control_update[idx]
+                    self.client_controls[cid][idx] = self.client_controls[cid][idx] + client_control_update[idx].astype(self.client_controls[cid][idx].dtype)
 
         # Compute weighted average of model parameters
         new_global_weights = [param_sum / total_examples for param_sum in sum_model_params]
@@ -123,11 +123,12 @@ class Scaffold(FedAvg):
             for cv_sum in sum_control_updates
         ]
         
-        # Update server control variate
+        # Update server control variate - fix casting issue
         total_clients = len(self.client_controls)
         cv_multiplier = len(results) / total_clients if total_clients > 0 else 1.0
         for idx in range(len(self.server_controls)):
-            self.server_controls[idx] += cv_multiplier * avg_control_update[idx]
+            update_value = cv_multiplier * avg_control_update[idx]
+            self.server_controls[idx] = self.server_controls[idx] + update_value.astype(self.server_controls[idx].dtype)
 
         losses = [fit_res.num_examples * fit_res.metrics["loss"] for _, fit_res in results]
         corrects = [round(fit_res.num_examples * fit_res.metrics["accuracy"]) for _, fit_res in results]
