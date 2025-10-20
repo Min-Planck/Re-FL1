@@ -175,7 +175,10 @@ def train_scaffold(
 ):
     from utils import get_parameters
     from flwr.common import ndarrays_to_parameters
-    # Get model parameters to ensure correct structure alignment
+    
+    # Get model state_dict keys để match với control variables
+    model_state_dict = net.state_dict()
+    model_keys = list(model_state_dict.keys())
     model_params = get_parameters(net)
     
     # Debug info to identify shape mismatches
@@ -188,16 +191,20 @@ def train_scaffold(
         raise ValueError(f"Control arrays length mismatch: model={len(model_params)}, "
                         f"client_control={len(client_control_old)}, server_control={len(server_control)}")
     
-    # Create correction tensors with proper shape checking
-    correction_tensors = []
-    for i, (c_i, c_s, model_param) in enumerate(zip(client_control_old, server_control, model_params)):
+    # Tạo mapping từ parameter keys đến correction tensors
+    correction_dict = {}
+    named_params = dict(net.named_parameters())
+    
+    for i, (key, c_i, c_s, model_param) in enumerate(zip(model_keys, client_control_old, server_control, model_params)):
         if c_i.shape != model_param.shape or c_s.shape != model_param.shape:
-            print(f"DEBUG: Shape mismatch at param {i}: "
+            print(f"DEBUG: Shape mismatch at param {i} ({key}): "
                   f"model={model_param.shape}, client_control={c_i.shape}, server_control={c_s.shape}")
-            raise ValueError(f"Shape mismatch at parameter {i}")
+            raise ValueError(f"Shape mismatch at parameter {i} ({key})")
         
-        correction = torch.tensor(c_i - c_s, dtype=torch.float32, device=device)
-        correction_tensors.append(correction)
+        # Chỉ tạo correction tensor nếu parameter này có gradient (là trainable)
+        if key in named_params and named_params[key].requires_grad:
+            correction = torch.tensor(c_i - c_s, dtype=torch.float32, device=device)
+            correction_dict[key] = correction
     
     initial_weights = get_parameters(net)
 
@@ -217,16 +224,17 @@ def train_scaffold(
             loss.backward()
             
             with torch.no_grad():
-                param_idx = 0
-                for param in net.parameters():
-                    if param.grad is not None and param_idx < len(correction_tensors):
-                        corr = correction_tensors[param_idx]
+                # Áp dụng correction cho từng parameter theo tên
+                for param_name, param in net.named_parameters():
+                    if param.grad is not None and param_name in correction_dict:
+                        corr = correction_dict[param_name]
                         # Ensure shapes match before subtraction
                         if param.grad.shape == corr.shape:
                             param.grad -= corr
                         else:
-                            print(f"⚠ Shape mismatch at param {param_idx}: grad={param.grad.shape}, corr={corr.shape}")
-                    param_idx += 1
+                            print(f"⚠ Shape mismatch at param {param_name}: grad={param.grad.shape}, corr={corr.shape}")
+                    elif param.grad is not None:
+                        print(f"DEBUG: Skipping correction for {param_name} (not in correction_dict or not trainable)")
             
             optimizer.step()
             
